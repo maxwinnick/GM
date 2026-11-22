@@ -1,0 +1,99 @@
+# ------------------------------------------------------------------------------------------
+# GM ECR Analytics pipeline: one config for every stage.
+# Paths are relative to this file's folder unless absolute.
+# ------------------------------------------------------------------------------------------
+
+input:
+  # GM's masked ECR extract (one row per WO_NO). If this file is missing, the pipeline uses the
+  # only .xlsx file in data/ instead.
+  workbook: data/Masking_Lookup_Reference.xlsx
+  sheet: result
+  # Optional: GM's "Overall Process Flow" guide. Used only as context for the LLM stages.
+  process_flow: data/Overall Process Flow.docx
+
+outputs: outputs
+
+# Which stages `python run_pipeline.py` runs, in order. Any stage can also be run alone with
+# `python run_pipeline.py --only <stage>` or skipped with `--skip <stage>`.
+stages:
+  text: true            # 01  Phase 1 text model: Steps 1-6, figures, write-up, per-field Paretos
+  cost: true            # 02  ITIS cost Paretos (count, COST_USD as given, recalculated), workbook, ECR lookup
+  terms: true           # 03  Global term-frequency table (vocabulary x cost, programs, assemblies)
+  diagnostics: true     # 04  Reason-code diagnostics and the k = 20 NMF pilot
+  topics: true          # 05  Steps 7-8: TF-IDF + NMF, BERTopic, AI samples, comparison, report
+  llm_topics: false     # 05b TopicGPT + LLooM through the LLM endpoint in .env (sends text; costs tokens)
+
+text:
+  states: all           # "all" or a comma-separated STATE list, e.g. "Closed"
+  min_df: 5             # Step 5 vocabulary cut-off (ECRs)
+  ai: cached            # off | cached (reuse cached LLM key terms, no calls) | sync (call the LLM)
+  ai_limit: null        # pilot: only send the first N ECRs when ai = sync
+
+llm:
+  # Endpoint, key and model id live in .env (LLM_API_BASE, LLM_API_KEY, LLM_MODEL), never here.
+  max_workers: 4        # parallel requests
+  dry_run: false        # true = print the token estimate for llm_topics and send nothing
+
+# Steps 7-8 (stage "topics").
+topics:
+  seed: 0
+
+  # Asserted at load when set. Use null to skip (e.g. on a new extract).
+  checks:
+    n_ecrs: null
+    cost_given_musd: null
+    cost_recalc_musd: null
+
+  # The WO range decides which free text an ECR has, so every model is fit inside one partition.
+  # Set masked: false to run on GM's own unmasked columns (TITLE, DESC_FOR_CHANGE, ...).
+  masked: true
+  partitions:
+    title_only:
+      label: "WO 4.1M-4.8M (title only)"
+      wo_min: 0
+      wo_max: 6999999
+      text_fields: [TITLE, COST_COMMENT]
+      structured_fields: [DRIVER, SUBTYPE]
+    full_text:
+      label: "WO 7.0M+ (full text)"
+      wo_min: 7000000
+      wo_max: 99999999
+      text_fields: [TITLE, DESC_FOR_CHANGE, REASON_FOR_CHANGE]
+      structured_fields: []
+
+  split:
+    holdout_share: 0.30           # stratified by STATE x VPPS L1
+
+  vocabulary:
+    ngrams: [1, 2]
+    min_df: 5
+    max_df_share: 0.25
+    use_theme_stopwords: true
+
+  axis:                           # topic -> "what" / "why" proposal (draft)
+    level: VPPS_L2
+    what_max_entropy: 0.55
+    why_min_entropy: 0.75
+    min_ecrs_with_vpps: 20
+
+  nmf:
+    k_grid: [10, 15, 20, 25, 30]
+    stability_match: 0.80
+    stability_target: 0.90
+    stability_repeats: 3
+    max_topic_share: 0.12
+    multilabel_min_share: 0.25
+
+  bertopic:
+    embedding_model: models/all-MiniLM-L6-v2   # local folder; `make models` downloads it
+    umap: {n_neighbors: 15, n_components: 5, min_dist: 0.0, metric: cosine}
+    min_cluster_sizes: [20, 40, 80]
+    max_outlier_share: 0.40
+    min_topics: 10
+    seeds: [0, 1, 2]
+    batch_size: 128
+
+  llm:
+    generation_sample_per_partition: 250
+    evaluation_sample_per_partition: 250
+    max_labels_per_ecr: 2

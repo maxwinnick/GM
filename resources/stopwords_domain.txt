@@ -1,0 +1,78 @@
+# Domain stop words removed AFTER lemmatization, on top of spaCy's English list.
+# One word per line; '#' starts a comment. Review this list with GM: it is the answer to
+# "what did you remove?". Every removal is counted in the Stopword_Audit sheet.
+
+# --- ECR process words (listed for GM review) ---
+ecr
+ewo
+vwo
+wo
+pccr
+pc-cr
+pn
+pns
+npn
+part
+number
+change
+see
+please
+attach
+attached
+detail
+following
+etc
+per
+via
+also
+need
+use
+make
+new
+current
+
+# --- placeholder tokens left by scrubbing / masking ---
+amt
+id
+supplier-name
+
+# --- vehicle line / platform / brand identifiers (program info lives in LEAD_PROGRAM) ---
+ldpu
+hdpu
+ld
+hd
+pu
+suv
+gmc
+chevy
+chevrolet
+cadillac
+buick
+t1xx
+zl
+bqx
+bqc
+mcm
+ccc
+appv
+ppv
+my
+
+# --- side / orientation markers (describe position, not the change) ---
+lh
+rh
+lhs
+rhs
+
+# --- units ---
+mm
+cm
+kg
+lb
+lbs
+usd
+eur
+cny
+krw
+mxn
+brl

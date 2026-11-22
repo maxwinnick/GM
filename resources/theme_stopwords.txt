@@ -1,0 +1,36 @@
+# Step 7 theme stop words (single words only; two-word phrases such as "rear fascia" are kept).
+# These words describe position or a generic action, so on their own they pull ECRs into
+# themes that are neither a reason nor a part. Phase 1 counts are unchanged. Review with GM.
+# --- position / side ---
+front
+rear
+frt
+rr
+upper
+lower
+upr
+lwr
+inner
+outer
+left
+right
+center
+ctr
+side
+top
+bottom
+# --- generic actions ---
+add
+added
+remove
+removed
+increase
+decrease
+change
+revise
+revision
+update
+new
+issue
+modify
+modification
